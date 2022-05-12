@@ -450,9 +450,6 @@ button {
     display: inline-block;
 }
 
-.edit-dropdown-btn {
-}
-
 .edit-dropdown-content {
     display: none;
     position: absolute;
