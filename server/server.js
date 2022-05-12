@@ -24,6 +24,7 @@ app.use(bodyParser.json());
 app.use(session({
     //key: 'userId', //name of the cookie
     secret: 'koketjosethobjasethobjakoketjo', //
+    maxAge: 24 * 60 * 60 * 1000,
     resave: true,
     saveUninitialized: true
 }))
@@ -78,10 +79,12 @@ app.post('/login', (req, response) => {
             bcrypt.compare(password, found[0].password, (err, res) => {
                 if(res){
                     req.session.regenerate(() => {
-                        console.log('password matches user logged in')
-                        req.session.found = found.username;
-                        // console.log(found[0].idUsers+' '+found[0].username)
-                        console.log(found)
+                        app.set('id', found[0].idUsers); 
+                        req.session.user = found[0].username; 
+                        console.log('password matches user logged in') 
+                        // console.log(req.session.user) 
+                        // console.log(res)                                              
+                        // console.log(found[0].idUsers)
                         response.send(found)
                     })
                 } else {
@@ -126,6 +129,91 @@ app.post('/login', (req, response) => {
 //         }
 //     })
 // })
+
+app.post('/upload', (req, res) => {
+    const data = {
+        publicId: req.body.publicId,
+        fileName: req.body.fileName,
+        uploadDate: req.body.uploadDate,
+        secureUrl: req.body.secureUrl,
+        size_in_mb: req.body.size_in_mb,                
+        format: req.body.format,                                
+        height: req.body.height,
+        width: req.body.width,
+        user_id: req.body.user_id
+    }
+
+    var sql = 'INSERT INTO public.photo SET ?'
+
+    db.query(sql, data, (err, result) => {
+        if(err){
+            res.send({error: 'Upload unsuccessful'})
+        } else {
+            res.send({message: 'Successfully uploaded'})
+        }
+    })
+
+})
+
+app.get('/images', (req, res) => {
+    const log_user = app.get('id');  
+    console.log(log_user)  
+    db.query('SELECT * FROM public.photo WHERE user_id = ?', log_user, (err, result) => {
+        if(err){
+            res.send({error: 'User not logged in '})
+            console.log(err)
+        } else {
+            res.send(result)
+            console.log(result)
+        }
+    })
+})
+
+app.put('/update', (req, res) => {
+
+    const newPublicId = req.body.newPublicId;
+    const publicId = req.body.publicId
+
+    cloudinary.uploader.rename(publicId, newPublicId, (error, result) => {
+
+        if(error){
+            console.log(error)
+        } else {
+            console.log(result)
+            db.query('UPDATE photo SET publicId = ? WHERE publicId = ?', [newPublicId, publicId], (new_error, new_result) => {
+                if(new_error) {
+                    res.send({error: 'Image\'s name failed to be changed'})
+                } else {
+                    res.send({message: 'Image\'s name successfully changed'})
+                }
+            })
+        }
+
+    })
+
+})
+
+app.delete('/delete/:publicId', (req, res) => {
+    const publicId = req.params.publicId;
+    cloudinary.uploader.destroy(publicId, (error, result) => {
+        if(error) {
+            console.log(error)
+            console.log('COULD NOT DELETE FROM CLOUDINARY')
+        } else {
+            console.log(result);
+            db.query('DELETE FROM photo WHERE publicId = ?', [publicId], (err, data) => {
+                if(err) {
+                    console.log(err)
+                    console.log('COULD NOT DELETE FROM DB')
+                    res.send({error: 'could not delete'})
+                } else{
+                    console.log(data)
+                    res.send({message: 'deleted successfully'})
+                }
+            })
+        }
+    });
+})
 
 app.listen(PORT, () => {
     console.log('running server');
